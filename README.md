@@ -11,17 +11,17 @@ You already make a simple reader and writer for that, you use
 
 Now just declare a storage destination for it.
 
-  case class PersonStore(implicit val ec: ExecutionContext) extends 	MongoStore {
-    def collectionName: String = "people"
-    override def indexes = List("name" -> 1)
-  }
+	case class PersonStore(implicit val ec: ExecutionContext) extends 	MongoStore {
+    	def collectionName: String = "people"
+    	override def indexes = List("name" -> 1)
+  	}
 
 And an instance which will implicitly tie the Person data type with
 the PersonStore.
 
-  implicit object personStore extends StoresWithMongo[PersonStore, Person] {
-    def s(implicit ec: ExecutionContext) = PersonStore()
-  }
+	implicit object personStore extends StoresWithMongo[PersonStore, Person] {
+		def s(implicit ec: ExecutionContext) = PersonStore()
+	}
 
 This enables the following easiness:
 
