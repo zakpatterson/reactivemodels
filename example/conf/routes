@@ -1,0 +1,2 @@
+GET				/				example.controllers.ViewController.index()
+GET				/insert			example.controllers.ViewController.insert()	

@@ -1,0 +1,14 @@
+@import example.models.{Quote, Portfolio}
+@(portfolio : Portfolio, quotes : List[Quote])
+<h1>Portfolio</h1>
+<ul>
+@portfolio.stocks.map{s=>
+	<li>@{s.symbol}:@{s.exchange}, @{s.name}</li>
+}
+</ul>
+<h1>Quotes</h1>
+<ul>
+@quotes.map{q=>
+	<li>@{q.stock.symbol}:@{q.price} at @{q.date}</li>
+}
+</ul>

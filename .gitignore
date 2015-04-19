@@ -1,0 +1,98 @@
+
+/bin/
+#*
+.project
+*~
+*.txt
+*.xml
+activator*
+*.jar
+*.zip
+*.sh
+*.graphml
+
+### BOWER (bower install should be used to install components from bower.json)###
+bower_components/
+
+### eclipse ###
+.settings
+.classpath
+schemaspy
+\#*
+.settings
+*.xml
+
+### idea ###
+.idea
+
+### Sass ###
+.sass-cache
+sass/.sass-cache
+
+### Scala ###
+*.class
+*.log
+
+# sbt specific
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+app-*/
+test-*/
+
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+
+### PlayFramework ###
+# Ignore Play! working directory #
+bin/
+/db
+.eclipse
+/lib/
+/logs/
+*.log
+
+/project/project
+/project/target
+/target
+tmp/
+test-result
+server.pid
+*.iml
+*.eml
+/dist/
+.cache
+
+### NODE ###
+node_modules
+node/*/dbconfig.js
+
+### SASS ###
+.sass-cache
+
+
+### Compiled stylesheets ###
+./node/public/css/*.css
+
+
+### AWS ###
+*.pem
+
+### Titan testing##
+/node/data/GodsGraph
+
+
+## securesocial ##
+modules/playgraph/conf/securesocial.conf
+
+# added by GitSavvy
+/modules/models/app/models/COMMIT
