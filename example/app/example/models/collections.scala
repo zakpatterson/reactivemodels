@@ -11,7 +11,7 @@ object collections {
     override def indexes = List("symbol" -> 1)
   }
 
-  implicit object portfolioStore extends (PortfolioStore StoresWithMongo Portfolio) {
+  implicit object StoresPortfolios extends (PortfolioStore StoresWithMongo Portfolio) {
     def s(implicit ec: ExecutionContext) = PortfolioStore()
   }
 
@@ -20,7 +20,7 @@ object collections {
     override def indexes = List("stock.symbol" -> 1)
   }
 
-  implicit object quoteStore extends (QuoteStore StoresWithMongo Quote){
+  implicit object StoresQuotes extends (QuoteStore StoresWithMongo Quote){
     def s(implicit ec : ExecutionContext) = QuoteStore()
   }
 }

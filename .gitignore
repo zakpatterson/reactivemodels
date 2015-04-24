@@ -92,7 +92,7 @@ node/*/dbconfig.js
 
 
 ## securesocial ##
-modules/playgraph/conf/securesocial.conf
+modules/toolbymeui/conf/securesocial.conf
 
 # added by GitSavvy
 /modules/models/app/models/COMMIT

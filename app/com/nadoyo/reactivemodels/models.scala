@@ -7,6 +7,7 @@ package com.nadoyo.reactivemodels
 
 import scala.concurrent.{ Future, ExecutionContext }
 import scala.util.{ Try, Success, Failure }
+import scala.language.higherKinds
 
 import org.joda.time.DateTime
 import play.api.libs.iteratee.Enumerator
