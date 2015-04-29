@@ -1,4 +1,4 @@
-package com.nadoyo.reactivemongo
+package com.nadoyo.reactivemodels
 
 import play.api.libs.iteratee._
 import reactivemongo.bson.BSONDocument
