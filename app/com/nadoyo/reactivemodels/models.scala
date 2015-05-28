@@ -5,6 +5,7 @@
 
 package com.nadoyo.reactivemodels
 
+import scala.annotation.implicitNotFound
 import scala.concurrent.{ Future, ExecutionContext }
 import scala.util.{ Try, Success, Failure }
 import scala.language.higherKinds
@@ -92,13 +93,23 @@ trait MongoStore extends Store {
 }
 
 
-trait WithId[IdT, T]{
+trait WithId[IdT, T]{ self =>
   def id : IdT 
   def t : T
+  def map[A](f : T => A) : WithId[IdT,A] = new WithId[IdT, A]{
+    def id = self.id
+    def t = f(self.t)
+  }
+  def flatMap[A](f : T => WithId[IdT, A]) : WithId[IdT, A] = f(self.t)
 }
 
-case class WithMongoId[T](id : BSONObjectID, t : T) extends WithId[BSONObjectID, T]
+object WithId{
+  type WithMongoId[T] = WithId[BSONObjectID,T]
 
+  case class HasMongoId[T](id : BSONObjectID, t : T) extends WithMongoId[T]
+}
+
+import WithId._
 /**
  * Now we can specify storable types in a MongoStore
  * Instances of `S StoresWithMongo T` need only to define what Store and what 
@@ -107,28 +118,39 @@ case class WithMongoId[T](id : BSONObjectID, t : T) extends WithId[BSONObjectID,
  * @param [S] the MongoStore type that can store a T
  * @param [T] the case class or other type that is storable.
  */
+@implicitNotFound(msg = "Cannot find available MongoStore ${S} for elements of type ${T}")
 trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWriter, BSONDocumentReader, BSONObjectID] {
-  def store(t: T)(implicit writer: BSONDocumentWriter[T], ec : ExecutionContext): Future[Try[WithId[BSONObjectID, T]]] = {
+  import Implicits._
+
+  def store(t: T)(implicit writer: BSONDocumentWriter[T], ec : ExecutionContext): Future[Try[WithMongoId[T]]] = {
     val id = BSONObjectID.generate
     val toInsert = BSONDocument("_id" -> id) ++ writer.write(t)
-    s.collection.insert(toInsert).map(err => if (err.ok) Success(WithMongoId(id, t)) else Failure[WithId[BSONObjectID, T]](err))
+    s.collection.insert(toInsert).map(err => if (err.ok) Success(HasMongoId(id, t)) else Failure[WithMongoId[T]](err))
   }
   
   /**
    * @param sort the Something like case class Sort(fieldname, direction)
    * @type [SO] the type representing a BSONReadable .  
    */
-  def enumerator[SO](sort : SO)(implicit reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = 
-   enumerator(BSONDocument(), BSONDocument(), sort)
+  def enumerator[SO](sort : SO)(implicit reader : BSONDocumentReader[T], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = 
+   s.collection.find(BSONDocument()).sort(sortwriter write sort).cursor[T].enumerate()
 
   def enumerator[Q, SO](query : Q, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = 
-    enumerator(query, BSONDocument(), sort)
+    s.collection.find(query).sort(sortwriter write sort).cursor[T].enumerate()
   
-  def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], filterwriter : BSONDocumentWriter[F], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = 
+  def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], filterwriter : BSONDocumentWriter[F], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = {
     s.collection.find(query, filter).sort(sortwriter write sort).cursor[T].enumerate() 
+  }
 
-  def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M], ec : ExecutionContext) : Future[LastError] = 
+  def enumeratorWithId[Q, SO](query : Q, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[WithMongoId[T]] = 
+    s.collection.find(query).sort(sortwriter write sort).cursor[WithMongoId[T]].enumerate()
+  
+  def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M], ec : ExecutionContext) : Future[LastError] = {
+    println("updating in collection " + s.collection.name)
+    println("query : " + BSONDocument.pretty(qwriter write q))
+    println("setting: " + BSONDocument.pretty(mwriter write m))
     s.collection.update(q, BSONDocument("$set" -> m))
+  }
 
   def remove[Q](q : Q, firstMatchOnly : Boolean = false)(implicit qwriter : BSONDocumentWriter[Q], ec : ExecutionContext) : Future[LastError] = 
     s.collection.remove(q, firstMatchOnly = firstMatchOnly)
@@ -153,12 +175,37 @@ trait Updater[T]{
  */
 object MongoStorage{
   import sorting._
-	def store[S <: MongoStore, T](t : T)(implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T], ec : ExecutionContext) : Future[Try[WithId[BSONObjectID, T]]] = storable store t
-  def query[Q, S <: MongoStore, T](q : Q)(implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[Q], ec : ExecutionContext) : Enumerator[T] = enumerator(q, BSONDocument())
-  def enumerator[S <: MongoStore, T]()(implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], ec : ExecutionContext) : Enumerator[T] = storable enumerator Unsorted()
-  def enumerator[S <: MongoStore, T, SO](sortBy : SO)(implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = storable enumerator sortBy
-  def enumerator[Q, S <: MongoStore, T, SO](query : Q, sortBy : SO)(implicit querywriter : BSONDocumentWriter[Q], storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = storable.enumerator(query, sortBy)
-  def flatstore[S <: MongoStore, T](ts : Traversable[T])(implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T], ec : ExecutionContext) : Future[Unit] = storable flatstore ts
+	def store[S <: MongoStore, T](t : T)
+      (implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T], 
+        ec : ExecutionContext) : Future[Try[WithMongoId[T]]] = storable store t
+
+  def query[Q, S <: MongoStore, T](q : Q)
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[Q], 
+      ec : ExecutionContext) : Enumerator[T] = storable.enumerator(q, Unsorted())
+
+  def queryWithId[Q, S <: MongoStore, T](q : Q)
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[Q], 
+      ec : ExecutionContext) : Enumerator[WithMongoId[T]] = storable.enumeratorWithId(q, Unsorted())
+  
+  def enumerator[S <: MongoStore, T]()
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T],
+      ec : ExecutionContext) : Enumerator[T] = storable enumerator Unsorted()
+
+  def enumerator[S <: MongoStore, T, SO](sortBy : SO)
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO], 
+      ec : ExecutionContext) : Enumerator[T] = storable enumerator sortBy
+
+  def enumerator[Q, S <: MongoStore, T, SO](query : Q, sortBy : SO)
+    (implicit querywriter : BSONDocumentWriter[Q], storable : S StoresWithMongo T, reader : BSONDocumentReader[T], 
+      writer : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] = {
+        println("querying " + storable.s.collection.name)
+        println(BSONDocument.pretty(querywriter.write(query)))
+        storable.enumerator(query, sortBy)
+  }
+
+  def flatstore[S <: MongoStore, T](ts : Traversable[T])(implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T], 
+    ec : ExecutionContext) : Future[Unit] = storable flatstore ts
+
   def updater[T](implicit updater : Updater[T]) : Updater[T] = updater
 }
 
@@ -181,6 +228,12 @@ object Implicits{
 
   implicit object DatetimeWriter extends BSONWriter[DateTime, BSONDateTime]{
     def write(t: DateTime): BSONDateTime = BSONDateTime(t.getMillis)
+  }
+
+  implicit def WithIdReader[T](implicit treader : BSONDocumentReader[T]) : BSONDocumentReader[WithMongoId[T]] = new BSONDocumentReader[WithMongoId[T]]{
+    def read(bson : BSONDocument) : WithMongoId[T] = {
+      HasMongoId(bson.getAs[BSONObjectID]("_id").get, treader.read(bson))
+    }
   }
 }
 
