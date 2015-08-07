@@ -96,3 +96,6 @@ modules/toolbymeui/conf/securesocial.conf
 
 # added by GitSavvy
 /modules/models/app/models/COMMIT
+
+# added by GitSavvy
+/.cache-main

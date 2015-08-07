@@ -3,7 +3,7 @@ import Keys._
 
 object Common {
   def version = "master-SNAPSHOT"
-  def playVersion = "2.3.8"
+  def playVersion = "2.3.9"
   def scalaVersion =  "2.11.6"
 
   def resolvers = Seq(
@@ -14,9 +14,7 @@ object Common {
   def dataDependencies = Seq(
     "org.scalatest" %% "scalatest" % "2.2.4" % "test"
     ,"org.reactivemongo" %% "reactivemongo" % "0.10.5.0.akka23"
-    ,"org.reactivemongo" %% "play2-reactivemongo" % "0.10.5.0.akka23"
     ,"org.scala-lang.modules" %% "scala-xml" % "1.0.3"
-    ,"com.typesafe.akka" %% "akka-actor" % "2.3.9"
     ,"org.scalaz" %% "scalaz-core" % "7.1.1"
     ,"joda-time" % "joda-time" % "2.7"
   )
