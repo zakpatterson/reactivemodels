@@ -99,3 +99,6 @@ modules/toolbymeui/conf/securesocial.conf
 
 # added by GitSavvy
 /.cache-main
+
+# added by GitSavvy
+/app/com/nadoyo/reactivemodels/models.scala

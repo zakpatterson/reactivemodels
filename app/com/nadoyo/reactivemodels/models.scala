@@ -169,6 +169,10 @@ object MongoStorage{
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T],
       ec : ExecutionContext) : Enumerator[T] = storable enumerator Unsorted()
 
+  def enumeratorWithId[S <: MongoStore, T]()
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T],
+      ec : ExecutionContext) : Enumerator[HasMongoId[T]] = storable enumeratorWithId (BSONDocument(), Unsorted())
+
   def enumerator[S <: MongoStore, T, SO](sortBy : SO)
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO],
       ec : ExecutionContext) : Enumerator[T] = storable enumerator sortBy
@@ -181,10 +185,13 @@ object MongoStorage{
         storable.enumerator(query, sortBy)
   }
 
+
+
   def flatstore[S <: MongoStore, T](ts : Traversable[T])(implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T],
     ec : ExecutionContext) : Future[Unit] = storable flatstore ts
 
   def updater[T](implicit upd : Updater[T]) : Updater[T] = upd
+
 }
 
 /**
