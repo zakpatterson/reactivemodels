@@ -22,7 +22,6 @@ import reactivemongo.api.ReadPreference
 import scalaz._
 import Scalaz._
 
-
 /**
  * Parent trait representing something that can
  * store data somewhere.
@@ -34,24 +33,26 @@ trait Store
  * Data can be represented as case classes, then we need only the correct
  * typeclass instances to move data in and out.
  *
- * @param [S] The Store type
- * @param [T] The type of data stored
- * @param [W[_]] A "writer", which can write some type for the store S.
- * @param [R[_]] A "reader", which can read data from the store S into T and maybe other types.
+ * @tparam S The Store type
+ * @tparam T The type of data stored
+ * @tparam W[_] A "writer", which can write some type for the store S.
+ * @tparam R[_] A "reader", which can read data from the store S into T and maybe other types.
+ * @tparam Oid An Id type
  */
 trait Stores[S, T, W[_], R[_], Oid] {
   def s(implicit ec : ExecutionContext) : S
   def store(t: T)(implicit writable: W[T], ec : ExecutionContext): Future[Try[WithId[Oid, T]]]
 
   def flatstore(ts : Traversable[T])(implicit writable : W[T], ec : ExecutionContext) : Future[Unit] = {
-    Future.sequence(ts.map(store _)).map(_ => ())
+    Future sequence (ts map (store _)) map (_ => ())
   }
 
   def enumerator[SO](sort : SO)(implicit reader : R[T], writer : W[SO], ec : ExecutionContext) : Enumerator[T]
 
   def enumerator[F, SO](filter : F, sort : SO)(implicit reader : R[T], filterwriter : W[F], sortwriter : W[SO], ec : ExecutionContext) : Enumerator[T]
 
-  def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : R[T], querywriter : W[Q], filterwriter : W[F], sortwriter : W[SO], ec : ExecutionContext) : Enumerator[T]
+  def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : R[T], querywriter : W[Q],
+    filterwriter : W[F], sortwriter : W[SO], ec : ExecutionContext) : Enumerator[T]
 
 }
 
@@ -91,8 +92,8 @@ trait MongoStore extends Store {
  * Instances of `S StoresWithMongo T` need only to define what Store and what
  * case class type are storable.
  * Requires BSONDocumentWriter and BSONDocumentReader to be defined on type T.
- * @param [S] the MongoStore type that can store a T
- * @param [T] the case class or other type that is storable.
+ * @tparam S the MongoStore type that can store a T
+ * @tparam T the case class or other type that is storable.
  */
 @implicitNotFound(msg = "Cannot find available MongoStore ${S} for elements of type ${T}")
 trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWriter, BSONDocumentReader, BSONObjectID] {
@@ -129,12 +130,17 @@ trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWrite
     s.collection.remove(q, firstMatchOnly = firstMatchOnly)
 }
 
-
+/**
+  *
+  * @tparam[T] the type of data updated by this updater.
+  */
 trait Updater[T]{
   type S <: MongoStore
   def store : S StoresWithMongo T
-  def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M], ec : ExecutionContext) : Future[WriteResult] = store.update(q,m)
-  def remove[Q](q : Q, firstMatchOnly : Boolean = false)(implicit qwriter : BSONDocumentWriter[Q], ec : ExecutionContext) : Future[WriteResult] = store.remove(q)
+  def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M],
+    ec : ExecutionContext) : Future[WriteResult] = store.update(q,m)
+  def remove[Q](q : Q, firstMatchOnly : Boolean = false)(implicit qwriter : BSONDocumentWriter[Q],
+    ec : ExecutionContext) : Future[WriteResult] = store.remove(q)
 }
 
 /**
@@ -185,10 +191,8 @@ object MongoStorage{
         storable.enumerator(query, sortBy)
   }
 
-
-
-  def flatstore[S <: MongoStore, T](ts : Traversable[T])(implicit storable : S StoresWithMongo T, writer : BSONDocumentWriter[T],
-    ec : ExecutionContext) : Future[Unit] = storable flatstore ts
+  def flatstore[S <: MongoStore, T](ts : Traversable[T])(implicit storable : S StoresWithMongo T,
+    writer : BSONDocumentWriter[T], ec : ExecutionContext) : Future[Unit] = storable flatstore ts
 
   def updater[T](implicit upd : Updater[T]) : Updater[T] = upd
 
@@ -199,9 +203,7 @@ object MongoStorage{
  */
 
 object Implicits{
-  implicit object HasIdWriter extends BSONDocumentWriter[HasId]{
-    def write(hasid : HasId) : BSONDocument = BSONDocument("_id" -> hasid.mongoId)
-  }
+  implicit val HasIdWriter = writer { t : HasId => BSONDocument("_id" -> t.mongoId) }
 
   implicit object DatetimeReader extends BSONReader[BSONDateTime, DateTime]{
     def read(bson: BSONDateTime): DateTime = new DateTime(bson.value)
