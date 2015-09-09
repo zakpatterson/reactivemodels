@@ -119,13 +119,13 @@ trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWrite
   def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], filterwriter : BSONDocumentWriter[F], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] =
       mystore.collection.find(query, filter).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
 
-  def enumeratorWithId[Q, SO](query : Q, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[HasMongoId[T]] =
-    mystore.collection.find(query).sort(sortwriter write sort).cursor[HasMongoId[T]](ReadPreference.nearest).enumerate()
+  def enumeratorWithId[Q](query : Q)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], ec : ExecutionContext) : Enumerator[HasMongoId[T]] =
+    mystore.collection.find(query).cursor[HasMongoId[T]](ReadPreference.nearest).enumerate()
+
+  def enumeratorWithId[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], filterWriter : BSONDocumentWriter[F], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[HasMongoId[T]] =
+    mystore.collection.find(query, filter).sort(sortwriter write sort).cursor[HasMongoId[T]](ReadPreference.nearest).enumerate()
 
   def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M], ec : ExecutionContext) : Future[WriteResult] = {
-    println("updating in collection " + mystore.collection.name)
-    println("query : " + BSONDocument.pretty(qwriter write q))
-    println("setting: " + BSONDocument.pretty(mwriter write m))
     mystore.collection.update(q, BSONDocument("$set" -> m))
   }
 
@@ -171,8 +171,20 @@ object MongoStorage{
       ec : ExecutionContext) : Enumerator[T] = storable.enumerator(q, Unsorted())
 
   def queryWithId[Q, S <: MongoStore, T](q : Q)
+    (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[Q], ec : ExecutionContext) : Enumerator[HasMongoId[T]] = {
+        querylogger.info("querying " + storable.s.collection.name)
+        querylogger.info(BSONDocument.pretty(writer.write(q)))
+        storable.enumeratorWithId(q)
+      }
+
+
+  def queryWithId[Q, F, S <: MongoStore, T](q : Q, f : F)
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[Q],
-      ec : ExecutionContext) : Enumerator[HasMongoId[T]] = storable.enumeratorWithId(q, Unsorted())
+      filterWriter : BSONDocumentWriter[F], ec : ExecutionContext) : Enumerator[HasMongoId[T]] = {
+        querylogger.info("querying " + storable.s.collection.name)
+        querylogger.info(BSONDocument.pretty(writer.write(q)))
+        storable.enumeratorWithId(q, f, Unsorted())
+      }
 
   def enumerator[S <: MongoStore, T]()
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T],
@@ -180,7 +192,7 @@ object MongoStorage{
 
   def enumeratorWithId[S <: MongoStore, T]()
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T],
-      ec : ExecutionContext) : Enumerator[HasMongoId[T]] = storable enumeratorWithId (BSONDocument(), Unsorted())
+      ec : ExecutionContext) : Enumerator[HasMongoId[T]] = storable enumeratorWithId (BSONDocument())
 
   def enumerator[S <: MongoStore, T, SO](sortBy : SO)
     (implicit storable : S StoresWithMongo T, reader : BSONDocumentReader[T], writer : BSONDocumentWriter[SO],
