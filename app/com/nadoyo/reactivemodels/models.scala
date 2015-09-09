@@ -97,10 +97,13 @@ trait MongoStore extends Store {
  */
 @implicitNotFound(msg = "Cannot find available MongoStore ${S} for elements of type ${T}")
 trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWriter, BSONDocumentReader, BSONObjectID] {
+  implicit val ec : ExecutionContext
+  lazy val mystore = s
+
   def store(t: T)(implicit writer: BSONDocumentWriter[T], ec : ExecutionContext): Future[Try[HasMongoId[T]]] = {
     val id = BSONObjectID.generate
     val toInsert = BSONDocument("_id" -> id) ++ writer.write(t)
-    s.collection.insert(toInsert).map(err => if (err.ok) Success(HasMongoId(id, t)) else Failure[HasMongoId[T]](err))
+    mystore.collection.insert(toInsert).map(err => if (err.ok) Success(HasMongoId(id, t)) else Failure[HasMongoId[T]](err))
   }
 
   /**
@@ -108,26 +111,26 @@ trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWrite
    * @type [SO] the type representing a BSONReadable .
    */
   def enumerator[SO](sort : SO)(implicit reader : BSONDocumentReader[T], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] =
-   s.collection.find(BSONDocument()).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
+   mystore.collection.find(BSONDocument()).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
 
   def enumerator[Q, SO](query : Q, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] =
-    s.collection.find(query).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
+    mystore.collection.find(query).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
 
   def enumerator[Q, F, SO](query : Q, filter : F, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], filterwriter : BSONDocumentWriter[F], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[T] =
-      s.collection.find(query, filter).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
+      mystore.collection.find(query, filter).sort(sortwriter write sort).cursor[T](ReadPreference.nearest).enumerate()
 
   def enumeratorWithId[Q, SO](query : Q, sort : SO)(implicit reader : BSONDocumentReader[T], querywriter : BSONDocumentWriter[Q], sortwriter : BSONDocumentWriter[SO], ec : ExecutionContext) : Enumerator[HasMongoId[T]] =
-    s.collection.find(query).sort(sortwriter write sort).cursor[HasMongoId[T]](ReadPreference.nearest).enumerate()
+    mystore.collection.find(query).sort(sortwriter write sort).cursor[HasMongoId[T]](ReadPreference.nearest).enumerate()
 
   def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M], ec : ExecutionContext) : Future[WriteResult] = {
-    println("updating in collection " + s.collection.name)
+    println("updating in collection " + mystore.collection.name)
     println("query : " + BSONDocument.pretty(qwriter write q))
     println("setting: " + BSONDocument.pretty(mwriter write m))
-    s.collection.update(q, BSONDocument("$set" -> m))
+    mystore.collection.update(q, BSONDocument("$set" -> m))
   }
 
   def remove[Q](q : Q, firstMatchOnly : Boolean = false)(implicit qwriter : BSONDocumentWriter[Q], ec : ExecutionContext) : Future[WriteResult] =
-    s.collection.remove(q, firstMatchOnly = firstMatchOnly)
+    mystore.collection.remove(q, firstMatchOnly = firstMatchOnly)
 }
 
 /**
