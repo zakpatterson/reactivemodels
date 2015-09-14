@@ -6,7 +6,7 @@ package object reactivemodels{
   case class HasId(id : String){
     def mongoId : BSONObjectID = BSONObjectID.parse(id).toOption.get
   }
-  
+
   def reader[A](f : BSONDocument => A) : BSONDocumentReader[A] = new BSONDocumentReader[A]{
     def read(bson : BSONDocument) : A = f(bson)
   }
@@ -14,19 +14,17 @@ package object reactivemodels{
   def writer[A](f : A => BSONDocument) : BSONDocumentWriter[A] = new BSONDocumentWriter[A]{
     def write(a : A) : BSONDocument = f(a)
   }
-  
-  
-  trait WithId[IdT, T]{ self =>
+
+
+  trait WithId[IdT, +T]{ self =>
     def id : IdT
     def t : T
-    def map[A](f : T => A) : WithId[IdT,A] = new WithId[IdT, A]{
-      def id = self.id
-      def t = f(self.t)
-    }
-    def flatMap[A](f : T => WithId[IdT, A]) : WithId[IdT, A] = f(self.t)
   }
 
-  case class HasMongoId[T](id : BSONObjectID, t : T) extends WithId[BSONObjectID,T]
+  case class HasMongoId[T](id : BSONObjectID, t : T) extends WithId[BSONObjectID,T]{
+    def map[A](f : T => A) : HasMongoId[A] = HasMongoId(id, f(t))
+    def flatMap[A](f : T => HasMongoId[A]) : HasMongoId[A] = HasMongoId(id, f(t).t)
+  }
 
   implicit def hasMongoIdWriter[T](implicit writer : BSONDocumentWriter[T]) = new BSONDocumentWriter[HasMongoId[T]]{
     def write(t : HasMongoId[T]) : BSONDocument = {

@@ -3,7 +3,8 @@
  * coupling encapsulated data with storage
  */
 
-package com.nadoyo.reactivemodels
+package com.nadoyo
+package reactivemodels
 
 import scala.annotation.implicitNotFound
 import scala.concurrent.{ Future, ExecutionContext }
@@ -18,6 +19,7 @@ import reactivemongo.api._
 import reactivemongo.bson._
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.api.ReadPreference
+
 
 import scalaz._
 import Scalaz._
@@ -139,11 +141,14 @@ trait StoresWithMongo[S <: MongoStore, T] extends Stores[S, T, BSONDocumentWrite
   */
 trait Updater[T]{
   type S <: MongoStore
+  lazy val mystore = store
   def store : S StoresWithMongo T
-  def update[Q, M](q : Q, m : M)(implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M],
-    ec : ExecutionContext) : Future[WriteResult] = store.update(q,m)
+  def update[Q, M](q : Q, m : M)
+    (implicit qwriter : BSONDocumentWriter[Q], mwriter : BSONDocumentWriter[M],ec : ExecutionContext)
+    : Future[WriteResult] = mystore.update(q,m)
+
   def remove[Q](q : Q, firstMatchOnly : Boolean = false)(implicit qwriter : BSONDocumentWriter[Q],
-    ec : ExecutionContext) : Future[WriteResult] = store.remove(q)
+    ec : ExecutionContext) : Future[WriteResult] = mystore.remove(q)
 }
 
 /**
@@ -211,29 +216,9 @@ object MongoStorage{
 
   def updater[T](implicit upd : Updater[T]) : Updater[T] = upd
 
+  def update[T](inst : HasMongoId[T])(implicit updater : Updater[T], writer : BSONDocumentWriter[T], ec : ExecutionContext) : Future[WriteResult] = {
+    import reactivemodels.Implicits._
+    updater.update(HasId(inst.id.stringify), inst.t)
+  }
+
 }
-
-/**
- * Common formats.
- */
-
-object Implicits{
-  implicit val HasIdWriter = writer { t : HasId => BSONDocument("_id" -> t.mongoId) }
-
-  implicit object DatetimeReader extends BSONReader[BSONDateTime, DateTime]{
-    def read(bson: BSONDateTime): DateTime = new DateTime(bson.value)
-  }
-
-  implicit object DatetimeWriter extends BSONWriter[DateTime, BSONDateTime]{
-    def write(t: DateTime): BSONDateTime = BSONDateTime(t.getMillis)
-  }
-
-  implicit def WithIdReader[T](implicit treader : BSONDocumentReader[T]) : BSONDocumentReader[HasMongoId[T]] = new BSONDocumentReader[HasMongoId[T]]{
-    def read(bson : BSONDocument) : HasMongoId[T] = {
-      HasMongoId(bson.getAs[BSONObjectID]("_id").get, treader.read(bson))
-    }
-  }
-}
-
-
-
