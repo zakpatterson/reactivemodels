@@ -14,9 +14,9 @@ object Common {
   def dataDependencies = Seq(
     "org.scalatest" %% "scalatest" % "2.2.5" % "test"
     ,"org.apache.commons" % "commons-lang3" % "3.3.2"
-    ,"org.reactivemongo" %% "reactivemongo" % "0.11.5"
+    ,"org.reactivemongo" %% "reactivemongo" % "0.11.7"
     ,"org.scalaz" %% "scalaz-core" % "7.1.2"
-    ,"joda-time" % "joda-time" % "2.8.1"
+    ,"joda-time" % "joda-time" % "2.8.2"
   )
 
   def appDependencies = dataDependencies
