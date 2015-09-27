@@ -68,7 +68,7 @@ trait MongoStore extends Store {
 
   lazy val driver = new MongoDriver
   def configuration : play.api.Configuration = play.api.Play.current.configuration
-  lazy val connection = driver.connection(List(configuration.getString("mongodb.host").get))
+  lazy val connection = driver.connection(configuration.getString("mongodb.host").get.split(",").toList)
 
   lazy val db = connection(configuration.getString("mongodb.db").get)
 
